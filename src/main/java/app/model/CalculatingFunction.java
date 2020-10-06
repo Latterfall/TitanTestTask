@@ -1,7 +1,6 @@
 package app.model;
 
 import org.graalvm.polyglot.Context;
-import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Value;
 
 import java.util.Locale;
@@ -9,23 +8,19 @@ import java.util.Locale;
 public class CalculatingFunction {
     // Initial values
     private final byte functionNumber;
-    private final String isOutputSorted;
+    private final String answerType;
+    private final long delay;
 
     // JS parsing objects
     private final Value polyglotFunction;
 
     // Mutable values
     private int iterationNumber;
-
-    // Transitional values
     private double inputParameter;
 
-    // DEBUG
-    private final long delay;
-
-    public CalculatingFunction(byte functionNumber, int initialValue, String function, String isOutputSorted, long delay) throws PolyglotException {
+    public CalculatingFunction(byte functionNumber, int initialValue, String function, String answerType, long delay) {
         this.functionNumber = functionNumber;
-        this.isOutputSorted = isOutputSorted;
+        this.answerType = answerType;
 
         Context context = Context.create();
         polyglotFunction = context.eval("js", function);
@@ -43,28 +38,28 @@ public class CalculatingFunction {
             e.printStackTrace();
         }
 
-        long start = System.nanoTime();
-
         double result;
+
+        long start = System.nanoTime();
         synchronized (this) {
             result = polyglotFunction.execute(inputParameter).asDouble();
         }
+        long evaluationTime = System.nanoTime() - start;
+
         inputParameter = result;
         iterationNumber++;
 
-        long evaluationTime = System.nanoTime() - start;
-
-        switch (isOutputSorted) {
+        switch (answerType) {
             case "sorted":
                 return
                         String.format(Locale.US, "%.2f", result) + "," +
-                                evaluationTime;
+                        evaluationTime;
             case "unsorted":
                 return
                         iterationNumber + "," +
                         functionNumber + "," +
                         String.format(Locale.US, "%.2f", result) + "," +
-                                evaluationTime;
+                        evaluationTime;
                         //evaluationTime/1000000 + "мс " + evaluationTime%1000000/1000 + "мкс ]";
             default:
                 return null;

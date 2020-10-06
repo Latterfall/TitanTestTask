@@ -25,11 +25,6 @@ public class CalculationsController {
             @RequestParam(name = "numberOfCalculations") int numberOfCalculations,
             @RequestParam(name = "answerType") String answerType
     ) {
-/*        return calculationService.calculateFunctions(
-                new CalculatingFunctionJSONPair(
-                        new CalculatingFunctionJSON(2, "x => x * 2"),
-                        new CalculatingFunctionJSON(2, "x => x + 7")
-                ), numberOfCalculations, answerType);*/
         return calculationService.calculateFunctions(functions, numberOfCalculations, answerType);
     }
 }

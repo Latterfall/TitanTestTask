@@ -12,6 +12,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Component
 public class CalculationService {
@@ -35,28 +36,33 @@ public class CalculationService {
             return Flux.just("Ошибка в функции JS!");
         }
 
-
         if (numberOfCalculations < 1) return Flux.just("Количество подсчётов меньше одного!");
+
+        if (!answerType.equals("sorted") && !answerType.equals("unsorted")) return Flux.just("Неподдерживаемый тип ответа!");
+
+        Flux<String> fluxOne = createFluxFromFunction(calculatingFunctionOne, numberOfCalculations);
+        Flux<String> fluxTwo = createFluxFromFunction(calculatingFunctionTwo, numberOfCalculations);
         switch (answerType) {
             case "sorted":
-                return Flux.zip(
-                        createFluxFromFunction(calculatingFunctionOne, numberOfCalculations),
-                        createFluxFromFunction(calculatingFunctionTwo, numberOfCalculations),
-                        (one, two) -> {
-                            int iterationNumberOne = calculatingFunctionOne.getIterationNumber();
-                            int iterationNumberTwo = calculatingFunctionTwo.getIterationNumber();
-                            int currentIteration = Math.min(iterationNumberOne, iterationNumberTwo);
+                AtomicInteger currentIteration = new AtomicInteger(1);
+                return Flux
+                        .zip(
+                            fluxOne,
+                            fluxTwo,
+                            (one, two) -> {
+                                int numberOfCalculatedAheadFunctionsOne = calculatingFunctionOne.getIterationNumber() - currentIteration.get();
+                                int numberOfCalculatedAheadFunctionsTwo = calculatingFunctionTwo.getIterationNumber() - currentIteration.get();
 
-                            return currentIteration + "," + one + "," + iterationNumberOne + "," + two + "," + iterationNumberTwo;
-                        }
-                );
+                                return
+                                        currentIteration.getAndIncrement() + "," +
+                                        one + "," + numberOfCalculatedAheadFunctionsOne + "," +
+                                        two + "," + numberOfCalculatedAheadFunctionsTwo;
+                            })
+                        .defaultIfEmpty("Ошибка в функции JS!");
             case "unsorted":
-                return Flux.merge(
-                        createFluxFromFunction(calculatingFunctionOne, numberOfCalculations),
-                        createFluxFromFunction(calculatingFunctionTwo, numberOfCalculations)
-                );
+                return Flux.merge(fluxOne, fluxTwo);
             default:
-                return Flux.just("Неподдерживаемый тип ответа!");
+                return null;
         }
     }
 
@@ -70,10 +76,16 @@ public class CalculationService {
         );
     }
 
-    private Flux<String> createFluxFromFunction(CalculatingFunction calculatingFunction, int numberOfCalculations) {
+    private Flux<String> createFluxFromFunction(CalculatingFunction calculatingFunction, int numberOfCalculations)  {
         return Flux
                 .just(calculatingFunction)
-                .flatMap(function -> Mono.fromFuture(CompletableFuture.supplyAsync(function::calculate)))
+                .flatMap(
+                        function -> Mono.fromFuture(
+                                CompletableFuture
+                                        .supplyAsync(function::calculate)
+                                        .exceptionally(exception -> null)
+                        )
+                )
                 .repeat(numberOfCalculations - 1);
     }
 }
